@@ -1,116 +1,223 @@
-const express = require("express");
-const mysql = require("mysql2");
-const bodyParser = require("body-parser");
-const cors = require("cors");
-const path = require("path");
+import express from "express";
+import cors from "cors";
+import mysql from "mysql2/promise";
 
-const app = express();
-const port = 3000;
+async function main() {
+  const app = express();
+  const PORT = 8000;  // Cambiado a 8000
 
+  app.use(cors());
+  app.use(express.json());
 
-app.use(cors());
-app.use(bodyParser.json());
+  // **Eliminé la parte que servía archivos estáticos y el catch-all para index.html**
+  // app.use(express.static(path.join(process.cwd(), "public")));
+  // app.get("*", (req, res) => {
+  //   res.sendFile(path.join(process.cwd(), "public", "index.html"));
+  // });
 
-
-app.use(express.static(path.join(__dirname, 'public')));  
-
-
-const db = mysql.createConnection({
-  host: "localhost",
-  user: "root", 
-  password: "@ndre2025", 
-  database: "colegio", 
-});
-
-db.connect((err) => {
-  if (err) {
-    console.error("Error de conexión a la base de datos:", err);
-    return;
-  }
-  console.log("Conectado a la base de datos");
-});
-
-
-app.post("/cambiar-contrasena", (req, res) => {
-  const { correo, nuevaContrasena } = req.body;
-
-  const query = "UPDATE usuarios SET contrasena = ? WHERE correo = ?";
-  db.query(query, [nuevaContrasena, correo], (err, result) => {
-    if (err) {
-      console.error("Error al actualizar contraseña:", err);
-      return res.status(500).json({ message: "Error al actualizar la contraseña" });
-    }
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
-
-    res.status(200).json({ message: "Contraseña actualizada correctamente" });
+  // Crear conexión a MySQL una sola vez y usarla en las rutas
+  const db = await mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "@ndre2025",
+    database: "Colegio_General",
   });
-});
 
+  console.log("✅ Conexión a MySQL establecida");
 
-app.post("/login", (req, res) => {
-  const { correo, contrasena } = req.body;
+  // Rutas
 
+  app.post('/cambiar-contrasena', async (req, res) => {
+    const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
 
-  const query = "SELECT * FROM usuarios WHERE correo = ? AND contrasena = ?";
-  db.query(query, [correo, contrasena], (err, results) => {
-    if (err) {
-      return res.status(500).send("Error de servidor");
+    if (!correo || !nuevaContrasena) {
+      return res.status(400).json({ error: "Faltan datos obligatorios." });
     }
 
-    if (results.length > 0) {
-    
-      return res.status(200).json({ message: "Login exitoso", user: results[0] });
-    } else {
- 
-      return res.status(401).send("Credenciales incorrectas");
+    try {
+      let query = "UPDATE usuarios SET contraseña = ?";
+      const values = [nuevaContrasena];
+
+      if (nuevoNombre) {
+        query += ", nombre = ?";
+        values.push(nuevoNombre);
+      }
+
+      if (nuevoApellido) {
+        query += ", apellido = ?";
+        values.push(nuevoApellido);
+      }
+
+      query += " WHERE correo = ?";
+      values.push(correo);
+
+      const [result] = await db.query(query, values);
+
+      return res.json({ mensaje: "✅ Datos actualizados correctamente" });
+    } catch (err) {
+      console.error("❌ Error al actualizar:", err);
+      return res.status(500).json({ error: "Error en la base de datos" });
     }
   });
-});
 
+  app.post("/login", async (req, res) => {
+    const { correo, contrasena } = req.body;
 
-app.get("/alumnos", (req, res) => {
-  const query = "SELECT * FROM alumnos";
-  db.query(query, (err, results) => {
-    if (err) {
-      return res.status(500).send("Error al obtener los alumnos");
+    try {
+      const [rows] = await db.query(
+        "SELECT id, correo, nombre, apellido FROM usuarios WHERE correo = ? AND contraseña = ?",
+        [correo, contrasena]
+      );
+
+      if (rows.length > 0) {
+        res.json(rows[0]);
+      } else {
+        res.status(401).json({ error: "Credenciales inválidas" });
+      }
+    } catch (err) {
+      console.error("❌ Error en /login:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
     }
-    res.status(200).json(results);
   });
-});
 
-app.get("/grados", (req, res) => {
-  const query = "SELECT * FROM subgrados";
-  db.query(query, (err, results) => {
-    if (err) {
-      return res.status(500).send("Error al obtener los grados");
+  app.post("/registro", async (req, res) => {
+    const { correox, nombrex, clavex } = req.body;
+
+    if (!correox || !nombrex || !clavex) {
+      return res.status(400).json({ error: "Faltan campos requeridos" });
     }
-    res.status(200).json(results);
-  });
-});
 
-app.get("/maestros", (req, res) => {
-  const query = "SELECT * FROM maestros";
-  db.query(query, (err, results) => {
-    if (err) {
-      return res.status(500).send("Error al obtener los maestros");
+    try {
+      const [existe] = await db.query("SELECT id FROM usuarios WHERE correo = ?", [correox]);
+      if (existe.length > 0) {
+        return res.status(409).json({ error: "El correo ya está registrado" });
+      }
+
+      await db.query(
+        "INSERT INTO usuarios (correo, nombre, contraseña, apellido) VALUES (?, ?, ?, '')",
+        [correox, nombrex, clavex]
+      );
+
+      res.json({ mensaje: "Usuario registrado correctamente" });
+    } catch (err) {
+      console.error("❌ Error en /registro:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
     }
-    res.status(200).json(results);
   });
-});
 
+  app.get("/niveles", async (req, res) => {
+    try {
+      const [rows] = await db.query("SELECT * FROM niveles_academicos");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
-app.listen(port, () => {
-  console.log(`Servidor corriendo en http://localhost:${port}`);
-});
+  app.get("/alumnos", async (req, res) => {
+    try {
+      const [rows] = await db.query(`
+        SELECT id, nombre, grado, correo, telefono, 
+               conteo_asistio, conteo_tarde, conteo_noasistio, 
+               asistencia, asistencia_hora
+        FROM alumnos
+      `);
+      res.json(rows);
+    } catch (err) {
+      console.error("❌ Error al obtener alumnos:", err);
+      res.status(500).json({ error: "Error al obtener alumnos" });
+    }
+  });
 
+  app.post("/alumnos", async (req, res) => {
+    const { nombre, grado, correo, telefono } = req.body;
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html')); 
-});
+    if (!nombre || !grado) {
+      return res.status(400).json({ error: "Faltan datos obligatorios" });
+    }
 
-app.get("/panel", (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'panel.html')); 
+    try {
+      await db.query(
+        "INSERT INTO alumnos (nombre, grado, correo, telefono) VALUES (?, ?, ?, ?)",
+        [nombre, grado, correo, telefono]
+      );
+      res.json({ mensaje: "Alumno agregado correctamente" });
+    } catch (err) {
+      console.error("❌ Error al agregar alumno:", err);
+      res.status(500).json({ error: "Error al agregar alumno" });
+    }
+  });
+
+  app.delete("/alumnos/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const [resultado] = await db.query("DELETE FROM alumnos WHERE id = ?", [id]);
+
+      if (resultado.affectedRows === 0) {
+        return res.status(404).json({ error: "Alumno no encontrado" });
+      }
+
+      res.json({ mensaje: "Alumno eliminado correctamente" });
+    } catch (err) {
+      console.error("❌ Error al eliminar alumno:", err);
+      res.status(500).json({ error: "Error al eliminar alumno" });
+    }
+  });
+
+  app.put("/alumnos/:id/asistencia", async (req, res) => {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    if (!estado) {
+      return res.status(400).json({ error: "Falta el estado de asistencia" });
+    }
+
+    try {
+      const horaActual = new Date();
+
+      let campoConteo;
+      if (estado === "asistio") campoConteo = "conteo_asistio";
+      else if (estado === "tarde") campoConteo = "conteo_tarde";
+      else if (estado === "noasistio") campoConteo = "conteo_noasistio";
+
+      if (!campoConteo) {
+        return res.status(400).json({ error: "Estado inválido" });
+      }
+
+      const query = `
+        UPDATE alumnos
+        SET asistencia = ?, asistencia_hora = ?, ${campoConteo} = ${campoConteo} + 1
+        WHERE id = ?
+      `;
+
+      const [result] = await db.query(query, [estado, horaActual, id]);
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Alumno no encontrado" });
+      }
+
+      res.json({ mensaje: "✅ Asistencia y conteo actualizados", estado, hora: horaActual });
+    } catch (error) {
+      console.error("❌ Error al actualizar asistencia:", error);
+      res.status(500).json({ error: "Error en el servidor" });
+    }
+  });
+
+  app.get("/usuarios", async (req, res) => {
+    try {
+      const [rows] = await db.query("SELECT id, correo, nombre, apellido FROM usuarios");
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.listen(PORT, () => {
+    console.log(`✅ Backend activo en: http://localhost:${PORT}`);
+  });
+}
+
+main().catch((error) => {
+  console.error("❌ Error iniciando el servidor:", error);
 });
