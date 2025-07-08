@@ -4,18 +4,11 @@ import mysql from "mysql2/promise";
 
 async function main() {
   const app = express();
-  const PORT = 8000;  // Cambiado a 8000
+  const PORT = 8000;  
 
   app.use(cors());
   app.use(express.json());
 
-  // **Eliminé la parte que servía archivos estáticos y el catch-all para index.html**
-  // app.use(express.static(path.join(process.cwd(), "public")));
-  // app.get("*", (req, res) => {
-  //   res.sendFile(path.join(process.cwd(), "public", "index.html"));
-  // });
-
-  // Crear conexión a MySQL una sola vez y usarla en las rutas
   const db = await mysql.createConnection({
     host: "localhost",
     user: "root",
