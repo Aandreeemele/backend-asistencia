@@ -1,100 +1,96 @@
 import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import bcrypt from "bcrypt";
+
+// 🔐 Cargar las variables desde el archivo .env
+dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const app = express();
-  const PORT = 8000;  
+  const PORT = process.env.PORT || 8000;
 
-  app.use(cors());
+  app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
   app.use(express.json());
 
+  // Servir frontend
+  app.use(express.static(path.join(__dirname, "frontend")));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "frontend/index.html"));
+  });
+
+  // 🛠 Conexión MySQL con variables de entorno
   const db = await mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "@ndre2025",
-    database: "Colegio_General",
+    host: process.env.DB_HOST || "localhost",
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASS || "",
+    database: process.env.DB_NAME || "Colegio_General",
   });
 
   console.log("✅ Conexión a MySQL establecida");
 
-  // Rutas
 
-  app.post('/cambiar-contrasena', async (req, res) => {
-    const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
-
-    if (!correo || !nuevaContrasena) {
-      return res.status(400).json({ error: "Faltan datos obligatorios." });
-    }
-
-    try {
-      let query = "UPDATE usuarios SET contraseña = ?";
-      const values = [nuevaContrasena];
-
-      if (nuevoNombre) {
-        query += ", nombre = ?";
-        values.push(nuevoNombre);
-      }
-
-      if (nuevoApellido) {
-        query += ", apellido = ?";
-        values.push(nuevoApellido);
-      }
-
-      query += " WHERE correo = ?";
-      values.push(correo);
-
-      const [result] = await db.query(query, values);
-
-      return res.json({ mensaje: "✅ Datos actualizados correctamente" });
-    } catch (err) {
-      console.error("❌ Error al actualizar:", err);
-      return res.status(500).json({ error: "Error en la base de datos" });
-    }
-  });
-
+  // LOGIN
   app.post("/login", async (req, res) => {
     const { correo, contrasena } = req.body;
-
     try {
-      const [rows] = await db.query(
-        "SELECT id, correo, nombre, apellido FROM usuarios WHERE correo = ? AND contraseña = ?",
-        [correo, contrasena]
-      );
+      const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
+      if (rows.length === 0) return res.status(401).json({ error: "Credenciales inválidas" });
 
-      if (rows.length > 0) {
-        res.json(rows[0]);
-      } else {
-        res.status(401).json({ error: "Credenciales inválidas" });
-      }
+      const usuario = rows[0];
+      const valid = await bcrypt.compare(contrasena, usuario.contraseña);
+      if (!valid) return res.status(401).json({ error: "Credenciales inválidas" });
+
+      const { id, nombre, apellido, rol } = usuario;
+      res.json({ id, correo, nombre, apellido, rol });
     } catch (err) {
       console.error("❌ Error en /login:", err);
       res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
+  // REGISTRO
   app.post("/registro", async (req, res) => {
-    const { correox, nombrex, clavex } = req.body;
-
-    if (!correox || !nombrex || !clavex) {
+    const { correox, nombrex, clavex, rolx } = req.body;
+    if (!correox || !nombrex || !clavex || !rolx) {
       return res.status(400).json({ error: "Faltan campos requeridos" });
     }
 
     try {
       const [existe] = await db.query("SELECT id FROM usuarios WHERE correo = ?", [correox]);
-      if (existe.length > 0) {
-        return res.status(409).json({ error: "El correo ya está registrado" });
-      }
+      if (existe.length > 0) return res.status(409).json({ error: "El correo ya está registrado" });
 
+      const hashed = await bcrypt.hash(clavex, 10);
       await db.query(
-        "INSERT INTO usuarios (correo, nombre, contraseña, apellido) VALUES (?, ?, ?, '')",
-        [correox, nombrex, clavex]
+        "INSERT INTO usuarios (correo, nombre, contraseña, apellido, rol) VALUES (?, ?, ?, '', ?)",
+        [correox, nombrex, hashed, rolx]
       );
-
       res.json({ mensaje: "Usuario registrado correctamente" });
     } catch (err) {
       console.error("❌ Error en /registro:", err);
       res.status(500).json({ error: "Error interno del servidor" });
+    }
+  });
+
+  // CAMBIO DE CONTRASEÑA
+  app.post("/cambiar-contrasena", async (req, res) => {
+    const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
+    try {
+      const hashed = await bcrypt.hash(nuevaContrasena, 10);
+      await db.query(
+        `UPDATE usuarios SET contraseña = ?, nombre = COALESCE(?, nombre), apellido = COALESCE(?, apellido) WHERE correo = ?`,
+        [hashed, nuevoNombre, nuevoApellido, correo]
+      );
+      res.json({ mensaje: "✅ Contraseña actualizada" });
+    } catch (err) {
+      console.error("❌ Error al cambiar contraseña:", err);
+      res.status(500).json({ error: "Error en el servidor" });
     }
   });
 
@@ -124,10 +120,7 @@ async function main() {
 
   app.post("/alumnos", async (req, res) => {
     const { nombre, grado, correo, telefono } = req.body;
-
-    if (!nombre || !grado) {
-      return res.status(400).json({ error: "Faltan datos obligatorios" });
-    }
+    if (!nombre || !grado) return res.status(400).json({ error: "Faltan datos obligatorios" });
 
     try {
       await db.query(
@@ -143,14 +136,9 @@ async function main() {
 
   app.delete("/alumnos/:id", async (req, res) => {
     const { id } = req.params;
-
     try {
       const [resultado] = await db.query("DELETE FROM alumnos WHERE id = ?", [id]);
-
-      if (resultado.affectedRows === 0) {
-        return res.status(404).json({ error: "Alumno no encontrado" });
-      }
-
+      if (resultado.affectedRows === 0) return res.status(404).json({ error: "Alumno no encontrado" });
       res.json({ mensaje: "Alumno eliminado correctamente" });
     } catch (err) {
       console.error("❌ Error al eliminar alumno:", err);
@@ -161,22 +149,15 @@ async function main() {
   app.put("/alumnos/:id/asistencia", async (req, res) => {
     const { id } = req.params;
     const { estado } = req.body;
-
-    if (!estado) {
-      return res.status(400).json({ error: "Falta el estado de asistencia" });
-    }
+    if (!estado) return res.status(400).json({ error: "Falta el estado de asistencia" });
 
     try {
       const horaActual = new Date();
-
       let campoConteo;
       if (estado === "asistio") campoConteo = "conteo_asistio";
       else if (estado === "tarde") campoConteo = "conteo_tarde";
       else if (estado === "noasistio") campoConteo = "conteo_noasistio";
-
-      if (!campoConteo) {
-        return res.status(400).json({ error: "Estado inválido" });
-      }
+      else return res.status(400).json({ error: "Estado inválido" });
 
       const query = `
         UPDATE alumnos
@@ -185,10 +166,7 @@ async function main() {
       `;
 
       const [result] = await db.query(query, [estado, horaActual, id]);
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: "Alumno no encontrado" });
-      }
+      if (result.affectedRows === 0) return res.status(404).json({ error: "Alumno no encontrado" });
 
       res.json({ mensaje: "✅ Asistencia y conteo actualizados", estado, hora: horaActual });
     } catch (error) {
