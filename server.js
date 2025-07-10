@@ -89,25 +89,7 @@ async function main() {
     }
   });
 
-  app.post("/login-alumno", async (req, res) => {
-    const { correo, contrasena } = req.body;
-    if (!correo || !contrasena) return res.status(400).json({ error: "Correo y contraseña requeridos" });
-
-    try {
-      const [rows] = await db.query("SELECT * FROM alumnos WHERE correo = ?", [correo]);
-      if (rows.length === 0) return res.status(401).json({ error: "Credenciales inválidas" });
-
-      const alumno = rows[0];
-      const valid = await bcrypt.compare(contrasena, alumno.contrasena);
-      if (!valid) return res.status(401).json({ error: "Credenciales inválidas" });
-
-      const { id, nombre, grado } = alumno;
-      res.json({ id, correo, nombre, grado });
-    } catch (err) {
-      console.error("❌ Error en /login-alumno:", err);
-      res.status(500).json({ error: "Error interno del servidor" });
-    }
-  });
+  
 
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
