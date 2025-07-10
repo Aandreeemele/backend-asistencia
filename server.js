@@ -32,17 +32,16 @@ async function main() {
 
   // 🔐 Encriptar contraseñas en texto plano (solo si no inician con $2b$)
   async function encriptarContraseñas() {
-    const [usuarios] = await db.query("SELECT id FROM usuarios");
-    const nueva = await bcrypt.hash("rm2025", 10);
-  
+    const [usuarios] = await db.query("SELECT id, contraseña FROM usuarios");
     for (const user of usuarios) {
-      await db.query("UPDATE usuarios SET contraseña = ? WHERE id = ?", [nueva, user.id]);
-      console.log(`🔒 Contraseña actualizada para usuario ID ${user.id}`);
+      if (!user.contraseña.startsWith("$2b$")) {
+        const hash = await bcrypt.hash("rm2025", 10);
+        await db.query("UPDATE usuarios SET contraseña = ? WHERE id = ?", [hash, user.id]);
+        console.log(`🔒 Contraseña actualizada para usuario ID ${user.id}`);
+      }
     }
-  
-    console.log("✅ Todas las contraseñas han sido establecidas como 'rm2025'");
+    console.log("✅ Todas las contraseñas han sido establecidas como 'rm2025' si no estaban encriptadas");
   }
-  
 
   // Ejecutar encriptación inicial
   await encriptarContraseñas();
@@ -50,15 +49,17 @@ async function main() {
   app.post("/login", async (req, res) => {
     const { correo, contrasena } = req.body;
     if (!correo || !contrasena) return res.status(400).json({ error: "Correo y contraseña requeridos" });
-  
+
     try {
       const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
       if (rows.length === 0) return res.status(401).json({ error: "Credenciales inválidas" });
-  
+
       const usuario = rows[0];
-      // Comparar contraseña directamente (texto plano)
-      if (contrasena !== usuario.contraseña) return res.status(401).json({ error: "Credenciales inválidas" });
-  
+
+      // Validar contraseña con bcrypt
+      const valid = await bcrypt.compare(contrasena, usuario.contraseña);
+      if (!valid) return res.status(401).json({ error: "Credenciales inválidas" });
+
       const { id, nombre, apellido, rol } = usuario;
       res.json({ id, correo, nombre, apellido, rol });
     } catch (err) {
@@ -66,21 +67,20 @@ async function main() {
       res.status(500).json({ error: "Error interno del servidor" });
     }
   });
-  
 
 
   app.post("/login-alumno", async (req, res) => {
     const { correo, contrasena } = req.body;
     if (!correo || !contrasena) return res.status(400).json({ error: "Correo y contraseña requeridos" });
-  
+
     try {
       const [rows] = await db.query("SELECT * FROM alumnos WHERE correo = ?", [correo]);
       if (rows.length === 0) return res.status(401).json({ error: "Credenciales inválidas" });
-  
+
       const alumno = rows[0];
       const valid = await bcrypt.compare(contrasena, alumno.contrasena);
       if (!valid) return res.status(401).json({ error: "Credenciales inválidas" });
-  
+
       const { id, nombre, grado } = alumno;
       res.json({ id, correo, nombre, grado });
     } catch (err) {
@@ -89,50 +89,54 @@ async function main() {
     }
   });
 
-  
+
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
-  
+
     if (!correox || !nombrex || !clavex || !rolx) {
       return res.status(400).json({ error: "Faltan campos requeridos" });
     }
-  
+
     try {
       const [existe] = await db.query("SELECT id FROM usuarios WHERE correo = ?", [correox]);
       if (existe.length > 0) {
         return res.status(409).json({ error: "El correo ya está registrado" });
       }
-  
-      // Guardar clavex SIN encriptar
+
+      // Encriptar la contraseña antes de guardar
+      const hash = await bcrypt.hash(clavex, 10);
+
       await db.query(
         "INSERT INTO usuarios (correo, nombre, contraseña, apellido, rol) VALUES (?, ?, ?, ?, ?)",
-        [correox, nombrex, clavex, apellidox || null, rolx || "maestro"]
+        [correox, nombrex, hash, apellidox || null, rolx || "maestro"]
       );
-  
+
       res.json({ mensaje: "✅ Usuario registrado correctamente" });
     } catch (err) {
       console.error("❌ Error en /registro:", err);
       res.status(500).json({ error: "Error interno del servidor al registrar usuario" });
     }
   });
-  
+
 
   app.post("/cambiar-contrasena", async (req, res) => {
     const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
-  
+
     if (!correo || !nuevaContrasena) {
       return res.status(400).json({ error: "Correo y nueva contraseña requeridos" });
     }
-  
+
     try {
-      // Actualizar la contraseña SIN encriptar
+      // Encriptar la nueva contraseña antes de guardar
+      const hash = await bcrypt.hash(nuevaContrasena, 10);
+
       await db.query(
         `UPDATE usuarios 
          SET contraseña = ?, 
              nombre = COALESCE(?, nombre), 
              apellido = COALESCE(?, apellido) 
          WHERE correo = ?`,
-        [nuevaContrasena, nuevoNombre, nuevoApellido, correo]
+        [hash, nuevoNombre, nuevoApellido, correo]
       );
       res.json({ mensaje: "✅ Contraseña actualizada" });
     } catch (err) {
@@ -140,7 +144,7 @@ async function main() {
       res.status(500).json({ error: "Error interno del servidor" });
     }
   });
-  
+
 
   app.get("/niveles", async (req, res) => {
     try {
