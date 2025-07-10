@@ -174,17 +174,17 @@ async function main() {
   app.get("/alumnos", async (req, res) => {
     try {
       const [rows] = await db.query(`
-        SELECT id, nombre, grado, correo, telefono, 
+        SELECT id, nombre, grado AS grado, correo, telefono, 
                conteo_asistio, conteo_tarde, conteo_noasistio, 
                asistencia, asistencia_hora
         FROM alumnos
       `);
       res.json(rows);
     } catch (err) {
-      console.error("❌ Error al obtener alumnos:", err);
-      res.status(500).json({ error: "Error interno del servidor" });
+      console.error("❌ Error al obtener alumnos:", err.message);
+      res.status(500).json({ error: "Error interno del servidor", detalle: err.message });
     }
-  });
+  });  
 
   app.post("/alumnos", async (req, res) => {
     const { nombre, grado, correo, telefono } = req.body;
