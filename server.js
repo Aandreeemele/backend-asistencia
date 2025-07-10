@@ -6,7 +6,6 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import bcrypt from "bcrypt";
 
-// 🔐 Cargar las variables desde el archivo .env
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,13 +21,11 @@ async function main() {
   }));
   app.use(express.json());
 
-  // Servir frontend
   app.use(express.static(path.join(__dirname, "frontend")));
   app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "frontend/index.html"));
   });
 
-  // 🛠 Conexión MySQL con variables de entorno
   const db = await mysql.createConnection({
     host: process.env.DB_HOST || "localhost",
     port: process.env.DB_PORT || 3306,
@@ -39,8 +36,6 @@ async function main() {
 
   console.log("✅ Conexión a MySQL establecida");
 
-
-  // LOGIN
   app.post("/login", async (req, res) => {
     const { correo, contrasena } = req.body;
     try {
@@ -59,7 +54,6 @@ async function main() {
     }
   });
 
-  // REGISTRO
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx } = req.body;
     if (!correox || !nombrex || !clavex || !rolx) {
@@ -82,7 +76,6 @@ async function main() {
     }
   });
 
-  // CAMBIO DE CONTRASEÑA
   app.post("/cambiar-contrasena", async (req, res) => {
     const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
     try {
@@ -188,8 +181,8 @@ async function main() {
     }
   });
 
-  app.listen(PORT, () => {
-    console.log(`✅ Backend activo en: http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`✅ Backend activo en: http://0.0.0.0:${PORT}`);
   });
 }
 
