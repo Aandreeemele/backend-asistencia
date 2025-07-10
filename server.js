@@ -15,16 +15,31 @@ async function main() {
   const PORT = process.env.PORT || 8000;
 
   app.use(cors({
-    origin: [
-      "https://aandreeemele.github.io",
-      "http://127.0.0.1:5500"
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: ["http://127.0.0.1:5500", "https://aandreeemele.github.io"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   }));
   
+  app.options("*", cors()); 
+  
+  app.options("*", cors());
 
+  app.use((req, res, next) => {
+    const allowedOrigins = ["http://127.0.0.1:5500", "https://aandreeemele.github.io"];
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    next();
+  });
+  
+  
 
+  app.use(express.json());
 
   const db = await mysql.createConnection({
     host: process.env.DB_HOST || "localhost",
@@ -38,6 +53,11 @@ async function main() {
 
   app.post("/login", async (req, res) => {
     const { correo, contrasena } = req.body;
+
+    if (!correo || !contrasena) {
+      return res.status(400).json({ error: "Correo y contraseña requeridos" });
+    }
+
     try {
       const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
       if (rows.length === 0) return res.status(401).json({ error: "Credenciales inválidas" });
@@ -56,6 +76,7 @@ async function main() {
 
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx } = req.body;
+
     if (!correox || !nombrex || !clavex || !rolx) {
       return res.status(400).json({ error: "Faltan campos requeridos" });
     }
@@ -78,16 +99,25 @@ async function main() {
 
   app.post("/cambiar-contrasena", async (req, res) => {
     const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
+
+    if (!correo || !nuevaContrasena) {
+      return res.status(400).json({ error: "Correo y nueva contraseña requeridos" });
+    }
+
     try {
       const hashed = await bcrypt.hash(nuevaContrasena, 10);
       await db.query(
-        `UPDATE usuarios SET contraseña = ?, nombre = COALESCE(?, nombre), apellido = COALESCE(?, apellido) WHERE correo = ?`,
+        `UPDATE usuarios 
+         SET contraseña = ?, 
+             nombre = COALESCE(?, nombre), 
+             apellido = COALESCE(?, apellido) 
+         WHERE correo = ?`,
         [hashed, nuevoNombre, nuevoApellido, correo]
       );
       res.json({ mensaje: "✅ Contraseña actualizada" });
     } catch (err) {
       console.error("❌ Error al cambiar contraseña:", err);
-      res.status(500).json({ error: "Error en el servidor" });
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
@@ -96,7 +126,8 @@ async function main() {
       const [rows] = await db.query("SELECT * FROM niveles_academicos");
       res.json(rows);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error("❌ Error al obtener niveles:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
@@ -111,12 +142,13 @@ async function main() {
       res.json(rows);
     } catch (err) {
       console.error("❌ Error al obtener alumnos:", err);
-      res.status(500).json({ error: "Error al obtener alumnos" });
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
   app.post("/alumnos", async (req, res) => {
     const { nombre, grado, correo, telefono } = req.body;
+
     if (!nombre || !grado) return res.status(400).json({ error: "Faltan datos obligatorios" });
 
     try {
@@ -127,30 +159,33 @@ async function main() {
       res.json({ mensaje: "Alumno agregado correctamente" });
     } catch (err) {
       console.error("❌ Error al agregar alumno:", err);
-      res.status(500).json({ error: "Error al agregar alumno" });
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
   app.delete("/alumnos/:id", async (req, res) => {
     const { id } = req.params;
+
     try {
       const [resultado] = await db.query("DELETE FROM alumnos WHERE id = ?", [id]);
       if (resultado.affectedRows === 0) return res.status(404).json({ error: "Alumno no encontrado" });
       res.json({ mensaje: "Alumno eliminado correctamente" });
     } catch (err) {
       console.error("❌ Error al eliminar alumno:", err);
-      res.status(500).json({ error: "Error al eliminar alumno" });
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
   app.put("/alumnos/:id/asistencia", async (req, res) => {
     const { id } = req.params;
     const { estado } = req.body;
+
     if (!estado) return res.status(400).json({ error: "Falta el estado de asistencia" });
 
     try {
       const horaActual = new Date();
       let campoConteo;
+
       if (estado === "asistio") campoConteo = "conteo_asistio";
       else if (estado === "tarde") campoConteo = "conteo_tarde";
       else if (estado === "noasistio") campoConteo = "conteo_noasistio";
@@ -166,9 +201,9 @@ async function main() {
       if (result.affectedRows === 0) return res.status(404).json({ error: "Alumno no encontrado" });
 
       res.json({ mensaje: "✅ Asistencia y conteo actualizados", estado, hora: horaActual });
-    } catch (error) {
-      console.error("❌ Error al actualizar asistencia:", error);
-      res.status(500).json({ error: "Error en el servidor" });
+    } catch (err) {
+      console.error("❌ Error al actualizar asistencia:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
@@ -177,7 +212,8 @@ async function main() {
       const [rows] = await db.query("SELECT id, correo, nombre, apellido FROM usuarios");
       res.json(rows);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error("❌ Error al obtener usuarios:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
     }
   });
 
