@@ -15,7 +15,11 @@ async function main() {
   const app = express();
   const PORT = process.env.PORT || 8000;
 
-  app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
+  app.use(cors({
+    origin: "https://aandreeemele.github.io",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
+  }));
   app.use(express.json());
 
   // Servir frontend
