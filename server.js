@@ -3,16 +3,13 @@ import cors from "cors";
 import mysql from "mysql2/promise";
 import path from "path";
 import { fileURLToPath } from "url";
-import dotenv from "dotenv";
 import bcrypt from "bcrypt";
-
-dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const app = express();
-  const PORT = process.env.PORT || 8000;
+  const PORT = 8000;
 
   app.use(cors({
     origin: ["http://127.0.0.1:5500", "https://aandreeemele.github.io"],
@@ -20,43 +17,22 @@ async function main() {
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   }));
-  
-  app.options("*", cors()); 
-  
-  app.options("*", cors());
-
-  app.use((req, res, next) => {
-    const allowedOrigins = ["http://127.0.0.1:5500", "https://aandreeemele.github.io"];
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    }
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    next();
-  });
-  
-  
 
   app.use(express.json());
 
   const db = await mysql.createConnection({
-    host: process.env.DB_HOST || "localhost",
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || "root",
-    password: process.env.DB_PASS || "",
-    database: process.env.DB_NAME || "Colegio_General",
+    host: "b2lze9yht73glvbix2y6-mysql.services.clever-cloud.com",
+    port: 3306,
+    user: "ubbkutvq3mqshiha",
+    password: "ICl5QtkL2qxedMmYLXlw",
+    database: "b2lze9yht73glvbix2y6",
   });
 
   console.log("✅ Conexión a MySQL establecida");
 
   app.post("/login", async (req, res) => {
     const { correo, contrasena } = req.body;
-
-    if (!correo || !contrasena) {
-      return res.status(400).json({ error: "Correo y contraseña requeridos" });
-    }
+    if (!correo || !contrasena) return res.status(400).json({ error: "Correo y contraseña requeridos" });
 
     try {
       const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
