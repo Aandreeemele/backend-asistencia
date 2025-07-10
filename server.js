@@ -15,16 +15,16 @@ async function main() {
   const PORT = process.env.PORT || 8000;
 
   app.use(cors({
-    origin: "https://aandreeemele.github.io",
+    origin: [
+      "https://aandreeemele.github.io",
+      "http://127.0.0.1:5500"
+    ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
   }));
-  app.use(express.json());
+  
 
-  app.use(express.static(path.join(__dirname, "frontend")));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "frontend/index.html"));
-  });
+
 
   const db = await mysql.createConnection({
     host: process.env.DB_HOST || "localhost",
