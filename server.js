@@ -51,27 +51,32 @@ async function main() {
   });
 
   app.post("/registro", async (req, res) => {
-    const { correox, nombrex, clavex, rolx } = req.body;
-
+    const { correox, nombrex, clavex, rolx, apellidox } = req.body;
+  
     if (!correox || !nombrex || !clavex || !rolx) {
       return res.status(400).json({ error: "Faltan campos requeridos" });
     }
-
+  
     try {
       const [existe] = await db.query("SELECT id FROM usuarios WHERE correo = ?", [correox]);
-      if (existe.length > 0) return res.status(409).json({ error: "El correo ya está registrado" });
-
+      if (existe.length > 0) {
+        return res.status(409).json({ error: "El correo ya está registrado" });
+      }
+  
       const hashed = await bcrypt.hash(clavex, 10);
       await db.query(
-        "INSERT INTO usuarios (correo, nombre, contraseña, apellido, rol) VALUES (?, ?, ?, '', ?)",
-        [correox, nombrex, hashed, rolx]
+        "INSERT INTO usuarios (correo, nombre, contraseña, apellido, rol) VALUES (?, ?, ?, ?, ?)",
+        [correox, nombrex, hashed, apellidox || null, rolx]
       );
-      res.json({ mensaje: "Usuario registrado correctamente" });
+  
+      res.json({ mensaje: "✅ Usuario registrado correctamente" });
     } catch (err) {
       console.error("❌ Error en /registro:", err);
-      res.status(500).json({ error: "Error interno del servidor" });
+      res.status(500).json({ error: "Error interno del servidor al registrar usuario" });
     }
   });
+  
+
 
   app.post("/cambiar-contrasena", async (req, res) => {
     const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
