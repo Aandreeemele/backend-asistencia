@@ -47,6 +47,8 @@ async function main() {
 
   // ✅ LOGIN FUNCIONAL COMPLETO
   app.post("/login", async (req, res) => {
+    console.log("📥 Body recibido en /login:", req.body);
+
     const { correo, contrasena } = req.body;
 
     if (!correo || !contrasena) {
@@ -88,8 +90,6 @@ async function main() {
       res.status(500).json({ error: "Error interno del servidor" });
     }
   });
-
-  
 
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
@@ -166,7 +166,7 @@ async function main() {
       console.error("❌ Error al obtener alumnos:", err.message);
       res.status(500).json({ error: "Error interno del servidor", detalle: err.message });
     }
-  });  
+  });
 
   app.post("/alumnos", async (req, res) => {
     const { nombre, grado, correo, telefono } = req.body;
