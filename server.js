@@ -29,7 +29,7 @@ async function main() {
 
   console.log("✅ Conexión a MySQL establecida");
 
-  // ✅ LOGIN SIN ENCRIPTACIÓN
+  // LOGIN SIN ENCRIPTACIÓN
   app.post("/login", async (req, res) => {
     const { correo, contrasena } = req.body;
 
@@ -59,7 +59,7 @@ async function main() {
     }
   });
 
-  // ✅ REGISTRO SIN ENCRIPTACIÓN
+  // REGISTRO SIN ENCRIPTACIÓN
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
 
@@ -85,7 +85,7 @@ async function main() {
     }
   });
 
-  // ✅ CAMBIO DE CONTRASEÑA SIN ENCRIPTACIÓN
+  // CAMBIO DE CONTRASEÑA SIN ENCRIPTACIÓN
   app.post("/cambiar-contrasena", async (req, res) => {
     const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
 
@@ -109,6 +109,7 @@ async function main() {
     }
   });
 
+  // OBTENER NIVELES ACADÉMICOS
   app.get("/niveles", async (req, res) => {
     try {
       const [rows] = await db.query("SELECT * FROM niveles_academicos");
@@ -119,6 +120,7 @@ async function main() {
     }
   });
 
+  // OBTENER ALUMNOS
   app.get("/alumnos", async (req, res) => {
     try {
       const [rows] = await db.query(`
@@ -134,6 +136,7 @@ async function main() {
     }
   });
 
+  // AGREGAR ALUMNO
   app.post("/alumnos", async (req, res) => {
     const { nombre, grado, correo, telefono } = req.body;
 
@@ -151,6 +154,7 @@ async function main() {
     }
   });
 
+  // ELIMINAR ALUMNO
   app.delete("/alumnos/:id", async (req, res) => {
     const { id } = req.params;
 
@@ -164,6 +168,7 @@ async function main() {
     }
   });
 
+  // ACTUALIZAR ASISTENCIA
   app.put("/alumnos/:id/asistencia", async (req, res) => {
     const { id } = req.params;
     const { estado } = req.body;
@@ -195,6 +200,7 @@ async function main() {
     }
   });
 
+  // OBTENER USUARIOS (opcional para interfaz)
   app.get("/usuarios", async (req, res) => {
     try {
       const [rows] = await db.query("SELECT id, correo, nombre, apellido FROM usuarios");
