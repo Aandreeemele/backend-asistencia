@@ -3,7 +3,6 @@ import cors from "cors";
 import mysql from "mysql2/promise";
 import path from "path";
 import { fileURLToPath } from "url";
-import bcrypt from "bcrypt";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,25 +29,8 @@ async function main() {
 
   console.log("✅ Conexión a MySQL establecida");
 
-  // 🔐 Encriptar contraseñas que no están en bcrypt
-  async function encriptarContraseñas() {
-    const [usuarios] = await db.query("SELECT id, contraseña FROM usuarios");
-    for (const user of usuarios) {
-      if (!user.contraseña.startsWith("$2b$")) {
-        const hash = await bcrypt.hash("rm2025", 10);
-        await db.query("UPDATE usuarios SET contraseña = ? WHERE id = ?", [hash, user.id]);
-        console.log(`🔒 Contraseña actualizada para usuario ID ${user.id}`);
-      }
-    }
-    console.log("✅ Contraseñas actualizadas si no estaban encriptadas");
-  }
-
-  await encriptarContraseñas();
-
-  // ✅ LOGIN FUNCIONAL COMPLETO
+  // ✅ LOGIN SIN ENCRIPTACIÓN
   app.post("/login", async (req, res) => {
-    console.log("📥 Body recibido en /login:", req.body);
-
     const { correo, contrasena } = req.body;
 
     if (!correo || !contrasena) {
@@ -63,23 +45,9 @@ async function main() {
       }
 
       const usuario = rows[0];
-      const passEnBD = usuario.contraseña;
 
-      let esValida = false;
-
-      if (passEnBD.startsWith("$2b$")) {
-        esValida = await bcrypt.compare(contrasena, passEnBD);
-      } else {
-        if (contrasena === "rm2028") {
-          esValida = true;
-          const hashNuevo = await bcrypt.hash("rm2028", 10);
-          await db.query("UPDATE usuarios SET contraseña = ? WHERE id = ?", [hashNuevo, usuario.id]);
-          console.log(`🔐 Contraseña rm2028 actualizada con hash para usuario ${usuario.correo}`);
-        }
-      }
-
-      if (!esValida) {
-        return res.status(401).json({ error: "Credenciales inválidas" });
+      if (contrasena !== usuario.contraseña) {
+        return res.status(401).json({ error: "Contraseña incorrecta" });
       }
 
       const { id, nombre, apellido, rol } = usuario;
@@ -91,6 +59,7 @@ async function main() {
     }
   });
 
+  // ✅ REGISTRO SIN ENCRIPTACIÓN
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
 
@@ -104,11 +73,9 @@ async function main() {
         return res.status(409).json({ error: "El correo ya está registrado" });
       }
 
-      const hash = await bcrypt.hash(clavex, 10);
-
       await db.query(
         "INSERT INTO usuarios (correo, nombre, contraseña, apellido, rol) VALUES (?, ?, ?, ?, ?)",
-        [correox, nombrex, hash, apellidox || null, rolx || "maestro"]
+        [correox, nombrex, clavex, apellidox || null, rolx || "maestro"]
       );
 
       res.json({ mensaje: "✅ Usuario registrado correctamente" });
@@ -118,6 +85,7 @@ async function main() {
     }
   });
 
+  // ✅ CAMBIO DE CONTRASEÑA SIN ENCRIPTACIÓN
   app.post("/cambiar-contrasena", async (req, res) => {
     const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
 
@@ -126,15 +94,13 @@ async function main() {
     }
 
     try {
-      const hash = await bcrypt.hash(nuevaContrasena, 10);
-
       await db.query(
         `UPDATE usuarios 
          SET contraseña = ?, 
              nombre = COALESCE(?, nombre), 
              apellido = COALESCE(?, apellido) 
          WHERE correo = ?`,
-        [hash, nuevoNombre, nuevoApellido, correo]
+        [nuevaContrasena, nuevoNombre, nuevoApellido, correo]
       );
       res.json({ mensaje: "✅ Contraseña actualizada" });
     } catch (err) {
