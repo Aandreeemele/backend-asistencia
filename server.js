@@ -142,6 +142,7 @@ async function main() {
       console.error("❌ Error al enviar correo:", error);
       res.status(500).json({ error: "No se pudo enviar el correo" });
     }
+    console.log(`Enviando código ${codigo} a ${correo}`);
   });
 
   // OBTENER NIVELES ACADÉMICOS
