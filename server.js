@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
 import path from "path";
+import nodemailer from "nodemailer";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -108,6 +109,41 @@ async function main() {
       res.status(500).json({ error: "Error interno del servidor" });
     }
   });
+
+  // ENVIAR CÓDIGO AL CORREO
+app.post("/enviar-codigo", async (req, res) => {
+  const { correo, codigo } = req.body;
+
+  if (!correo || !codigo) {
+    return res.status(400).json({ error: "Correo y código son requeridos" });
+  }
+
+  // Configura tu correo (usa uno de Gmail o institucional que permita SMTP)
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "aamelendez@scl.edu.gt",       
+      pass: "rockemma"        
+    }
+  });
+
+  const mailOptions = {
+    from: "SCL Asistencia <tucorreo@gmail.com>",
+    to: correo,
+    subject: "Código de recuperación",
+    text: `Tu código de verificación es: ${codigo}`
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("📧 Código enviado a:", correo);
+    res.status(200).json({ mensaje: "Correo enviado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al enviar correo:", error);
+    res.status(500).json({ error: "No se pudo enviar el correo" });
+  }
+});
+
 
   // OBTENER NIVELES ACADÉMICOS
   app.get("/niveles", async (req, res) => {
