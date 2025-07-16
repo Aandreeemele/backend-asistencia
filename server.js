@@ -3,16 +3,13 @@ import cors from "cors";
 import mysql from "mysql2/promise";
 import path from "path";
 import nodemailer from "nodemailer";
-import dotenv from "dotenv";
 import { fileURLToPath } from "url";
-
-dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const app = express();
-  const PORT = process.env.PORT || 8000;
+  const PORT = 8000;
 
   app.use(cors({
     origin: ["http://127.0.0.1:5500", "https://aandreeemele.github.io"],
@@ -23,12 +20,13 @@ async function main() {
 
   app.use(express.json());
 
+  // Aquí pones tus credenciales directamente sin usar process.env
   const db = await mysql.createConnection({
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
+    host: "b2lze9yht73glvbix2y6-mysql.services.clever-cloud.com",
+    port: 3306,
+    user: "ubbkutvq3mqshiha",
+    password: "ICl5QtkL2qxedMmYLXlw",
+    database: "b2lze9yht73glvbix2y6",
   });
 
   console.log("✅ Conexión a MySQL establecida");
@@ -124,13 +122,13 @@ async function main() {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS
+        user: "aamelendez@scl.edu.gt",       // aquí tu correo real
+        pass: "rockemma"                     // aquí tu contraseña de aplicación Gmail real
       }
     });
 
     const mailOptions = {
-      from: `SCL Asistencia <${process.env.MAIL_USER}>`,
+      from: "SCL Asistencia <aamelendez@scl.edu.gt>",
       to: correo,
       subject: "Código de recuperación",
       text: `Tu código de verificación es: ${codigo}`
