@@ -3,13 +3,16 @@ import cors from "cors";
 import mysql from "mysql2/promise";
 import path from "path";
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
 import { fileURLToPath } from "url";
+
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const app = express();
-  const PORT = 8000;
+  const PORT = process.env.PORT || 8000;
 
   app.use(cors({
     origin: ["http://127.0.0.1:5500", "https://aandreeemele.github.io"],
@@ -21,11 +24,11 @@ async function main() {
   app.use(express.json());
 
   const db = await mysql.createConnection({
-    host: "b2lze9yht73glvbix2y6-mysql.services.clever-cloud.com",
-    port: 3306,
-    user: "ubbkutvq3mqshiha",
-    password: "ICl5QtkL2qxedMmYLXlw",
-    database: "b2lze9yht73glvbix2y6",
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
   });
 
   console.log("✅ Conexión a MySQL establecida");
@@ -111,39 +114,37 @@ async function main() {
   });
 
   // ENVIAR CÓDIGO AL CORREO
-app.post("/enviar-codigo", async (req, res) => {
-  const { correo, codigo } = req.body;
+  app.post("/enviar-codigo", async (req, res) => {
+    const { correo, codigo } = req.body;
 
-  if (!correo || !codigo) {
-    return res.status(400).json({ error: "Correo y código son requeridos" });
-  }
+    if (!correo || !codigo) {
+      return res.status(400).json({ error: "Correo y código son requeridos" });
+    }
 
-  // Configura tu correo (usa uno de Gmail o institucional que permita SMTP)
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "aamelendez@scl.edu.gt",       
-      pass: "rockemma"        
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS
+      }
+    });
+
+    const mailOptions = {
+      from: `SCL Asistencia <${process.env.MAIL_USER}>`,
+      to: correo,
+      subject: "Código de recuperación",
+      text: `Tu código de verificación es: ${codigo}`
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log("📧 Código enviado a:", correo);
+      res.status(200).json({ mensaje: "Correo enviado correctamente" });
+    } catch (error) {
+      console.error("❌ Error al enviar correo:", error);
+      res.status(500).json({ error: "No se pudo enviar el correo" });
     }
   });
-
-  const mailOptions = {
-    from: "SCL Asistencia <tucorreo@gmail.com>",
-    to: correo,
-    subject: "Código de recuperación",
-    text: `Tu código de verificación es: ${codigo}`
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log("📧 Código enviado a:", correo);
-    res.status(200).json({ mensaje: "Correo enviado correctamente" });
-  } catch (error) {
-    console.error("❌ Error al enviar correo:", error);
-    res.status(500).json({ error: "No se pudo enviar el correo" });
-  }
-});
-
 
   // OBTENER NIVELES ACADÉMICOS
   app.get("/niveles", async (req, res) => {
