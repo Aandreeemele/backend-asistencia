@@ -31,38 +31,37 @@ async function main() {
   console.log("✅ Conexión a MySQL establecida");
 
   // LOGIN SIN ENCRIPTACIÓN
-  app.post("/login", async (req, res) => {
-    const { correo, contrasena } = req.body;
+  // LOGIN SIN ENCRIPTACIÓN
+app.post("/login", async (req, res) => {
+  const { correo, contrasena } = req.body;
 
-    if (!correo || !contrasena) {
-      return res.status(400).json({ error: "Correo y contraseña requeridos" });
-    }
+  try {
+    const [rows] = await db.query(
+      "SELECT * FROM usuarios WHERE correo = ? AND contraseña = ?",
+      [correo, contrasena]
+    );
 
-    try {
-      const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
-
-      if (rows.length === 0) {
-        return res.status(401).json({ error: "Credenciales inválidas" });
-      }
-
+    if (rows.length > 0) {
       const usuario = rows[0];
 
-      if (contrasena !== usuario.contraseña) {
-        return res.status(401).json({ error: "Contraseña incorrecta" });
-      }
-
-      // IMPORTANTE: Enviar grado_asignado tal cual está en la BD
-      const { id, nombre, apellido, rol, grado_asignado } = usuario;
-
-      console.log(`Login exitoso para ${correo} con grado asignado: "${grado_asignado}"`);
-
-      res.json({ id, correo, nombre, apellido, rol, grado_asignado });
-
-    } catch (err) {
-      console.error("❌ Error en /login:", err);
-      res.status(500).json({ error: "Error interno del servidor" });
+      res.json({
+        success: true,
+        correo: usuario.correo,
+        rol: usuario.rol,
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        gradoAsignado: usuario.grado_asignado || "", // ✅ Este nombre es el correcto
+      });      
+    } else {
+      res.json({ success: false, message: "Credenciales inválidas" });
     }
-  });
+  } catch (error) {
+    console.error("Error al conectar a la base de datos:", error);
+    res.status(500).json({ success: false, message: "Error interno del servidor" });
+  }
+});
+
+  
   // REGISTRO SIN ENCRIPTACIÓN
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
