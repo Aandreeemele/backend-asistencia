@@ -20,7 +20,6 @@ async function main() {
 
   app.use(express.json());
 
-  // Aquí pones tus credenciales directamente sin usar process.env
   const db = await mysql.createConnection({
     host: "b2lze9yht73glvbix2y6-mysql.services.clever-cloud.com",
     port: 3306,
@@ -52,7 +51,11 @@ async function main() {
         return res.status(401).json({ error: "Contraseña incorrecta" });
       }
 
+      // IMPORTANTE: Enviar grado_asignado tal cual está en la BD
       const { id, nombre, apellido, rol, grado_asignado } = usuario;
+
+      console.log(`Login exitoso para ${correo} con grado asignado: "${grado_asignado}"`);
+
       res.json({ id, correo, nombre, apellido, rol, grado_asignado });
 
     } catch (err) {
@@ -122,8 +125,8 @@ async function main() {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: "aamelendez@scl.edu.gt",       // aquí tu correo real
-        pass: "rockemma"                     // aquí tu contraseña de aplicación Gmail real
+        user: "aamelendez@scl.edu.gt",
+        pass: "rockemma"
       }
     });
 
