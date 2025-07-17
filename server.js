@@ -189,7 +189,7 @@ async function main() {
       service: "gmail",
       auth: {
         user: "aamelendez@scl.edu.gt",
-        pass: "rockemma"
+        pass: "ANDRE2024SCL"
       }
     });
 
