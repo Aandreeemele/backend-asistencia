@@ -50,7 +50,7 @@ app.post("/login", async (req, res) => {
         rol: usuario.rol,
         nombre: usuario.nombre,
         apellido: usuario.apellido,
-        gradoAsignado: correo.grado_asignado || "", // ✅ CORREGIDO: este campo se devuelve correctamente
+        gradoAsignado: usuario.grado_asignado || "", // ✅ CORREGIDO: este campo se devuelve correctamente
       });      
     } else {
       res.json({ success: false, message: "Credenciales inválidas" });
