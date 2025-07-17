@@ -31,7 +31,7 @@ async function main() {
   console.log("✅ Conexión a MySQL establecida");
 
   // LOGIN SIN ENCRIPTACIÓN
-  // LOGIN SIN ENCRIPTACIÓN
+// LOGIN SIN ENCRIPTACIÓN
 app.post("/login", async (req, res) => {
   const { correo, contrasena } = req.body;
 
@@ -50,7 +50,7 @@ app.post("/login", async (req, res) => {
         rol: usuario.rol,
         nombre: usuario.nombre,
         apellido: usuario.apellido,
-        gradoAsignado: usuario.grado_asignado || "", // ✅ Este nombre es el correcto
+        gradoAsignado: correo.grado_asignado || "", // ✅ CORREGIDO: este campo se devuelve correctamente
       });      
     } else {
       res.json({ success: false, message: "Credenciales inválidas" });
@@ -60,6 +60,7 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ success: false, message: "Error interno del servidor" });
   }
 });
+
 
   
   // REGISTRO SIN ENCRIPTACIÓN
