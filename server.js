@@ -15,17 +15,22 @@ async function main() {
     origin: ["http://127.0.0.1:5500", "https://aandreeemele.github.io"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
+    credentials: true,
+    connectionLimit: 10,
+    queueLimit: 0
   }));
 
   app.use(express.json());
 
-  const db = await mysql.createConnection({
+  const db = await mysql.createPool({
     host: "b2lze9yht73glvbix2y6-mysql.services.clever-cloud.com",
     port: 3306,
     user: "ubbkutvq3mqshiha",
     password: "ICl5QtkL2qxedMmYLXlw",
     database: "b2lze9yht73glvbix2y6",
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
   });
 
   console.log("✅ Conexión a MySQL establecida");
