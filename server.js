@@ -31,38 +31,35 @@ async function main() {
   console.log("✅ Conexión a MySQL establecida");
 
   // LOGIN SIN ENCRIPTACIÓN
-// LOGIN SIN ENCRIPTACIÓN
-app.post("/login", async (req, res) => {
-  const { correo, contrasena } = req.body;
+  app.post("/login", async (req, res) => {
+    const { correo, contrasena } = req.body;
 
-  try {
-    const [rows] = await db.query(
-      "SELECT * FROM usuarios WHERE correo = ? AND contraseña = ?",
-      [correo, contrasena]
-    );
+    try {
+      const [rows] = await db.query(
+        "SELECT * FROM usuarios WHERE correo = ? AND contraseña = ?",
+        [correo, contrasena]
+      );
 
-    if (rows.length > 0) {
-      const usuario = rows[0];
+      if (rows.length > 0) {
+        const usuario = rows[0];
 
-      res.json({
-        success: true,
-        correo: usuario.correo,
-        rol: usuario.rol,
-        nombre: usuario.nombre,
-        apellido: usuario.apellido,
-        gradoAsignado: usuario.grado_asignado || "", // ✅ CORREGIDO: este campo se devuelve correctamente
-      });      
-    } else {
-      res.json({ success: false, message: "Credenciales inválidas" });
+        res.json({
+          success: true,
+          correo: usuario.correo,
+          rol: usuario.rol,
+          nombre: usuario.nombre,
+          apellido: usuario.apellido,
+          gradoAsignado: usuario.grado_asignado || "",
+        });      
+      } else {
+        res.json({ success: false, message: "Credenciales inválidas" });
+      }
+    } catch (error) {
+      console.error("Error al conectar a la base de datos:", error);
+      res.status(500).json({ success: false, message: "Error interno del servidor" });
     }
-  } catch (error) {
-    console.error("Error al conectar a la base de datos:", error);
-    res.status(500).json({ success: false, message: "Error interno del servidor" });
-  }
-});
+  });
 
-
-  
   // REGISTRO SIN ENCRIPTACIÓN
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
@@ -89,24 +86,91 @@ app.post("/login", async (req, res) => {
     }
   });
 
-  // CAMBIO DE CONTRASEÑA SIN ENCRIPTACIÓN
-  app.post("/cambiar-contrasena", async (req, res) => {
-    const { correo, nuevaContrasena, nuevoNombre, nuevoApellido } = req.body;
+  // ENVIAR CÓDIGO AL CORREO Y GUARDAR EN BD
+  app.post("/enviar-codigo", async (req, res) => {
+    const { correo, codigo } = req.body;
 
-    if (!correo || !nuevaContrasena) {
-      return res.status(400).json({ error: "Correo y nueva contraseña requeridos" });
+    if (!correo || !codigo) {
+      return res.status(400).json({ error: "Correo y código son requeridos" });
     }
 
     try {
+      // Verificar que usuario existe
+      const [usuario] = await db.query("SELECT id FROM usuarios WHERE correo = ?", [correo]);
+      if (usuario.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+
+      // Guardar código y expiración 10 minutos después
+      const expiracion = new Date(Date.now() + 10 * 60 * 1000);
       await db.query(
-        `UPDATE usuarios 
+        "UPDATE usuarios SET codigo_recuperacion = ?, codigo_expira = ? WHERE correo = ?",
+        [codigo, expiracion, correo]
+      );
+
+      // Configurar nodemailer
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: "aamelendez@scl.edu.gt",
+          pass: "rockemma"
+        }
+      });
+
+      const mailOptions = {
+        from: "SCL Asistencia <aamelendez@scl.edu.gt>",
+        to: correo,
+        subject: "Código de recuperación",
+        text: `Tu código de verificación es: ${codigo}. Expira en 10 minutos.`
+      };
+
+      await transporter.sendMail(mailOptions);
+
+      console.log("📧 Código enviado a:", correo);
+      res.status(200).json({ mensaje: "Correo enviado correctamente" });
+    } catch (error) {
+      console.error("❌ Error al enviar correo:", error);
+      res.status(500).json({ error: "No se pudo enviar el correo" });
+    }
+  });
+
+  // CAMBIAR CONTRASEÑA VALIDANDO CÓDIGO
+  app.post("/cambiar-contrasena", async (req, res) => {
+    const { correo, nuevaContrasena, nuevoNombre, nuevoApellido, codigoIngresado } = req.body;
+
+    if (!correo || !nuevaContrasena || !codigoIngresado) {
+      return res.status(400).json({ error: "Faltan datos obligatorios" });
+    }
+
+    try {
+      const [usuario] = await db.query(
+        "SELECT codigo_recuperacion, codigo_expira FROM usuarios WHERE correo = ?",
+        [correo]
+      );
+
+      if (usuario.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+
+      const { codigo_recuperacion, codigo_expira } = usuario[0];
+
+      if (!codigo_recuperacion || codigo_recuperacion !== codigoIngresado) {
+        return res.status(400).json({ error: "Código incorrecto" });
+      }
+
+      if (new Date(codigo_expira) < new Date()) {
+        return res.status(400).json({ error: "Código expirado" });
+      }
+
+      // Actualizar contraseña, nombre, apellido y limpiar código
+      await db.query(
+        `UPDATE usuarios
          SET contraseña = ?, 
              nombre = COALESCE(?, nombre), 
-             apellido = COALESCE(?, apellido) 
+             apellido = COALESCE(?, apellido),
+             codigo_recuperacion = NULL,
+             codigo_expira = NULL
          WHERE correo = ?`,
         [nuevaContrasena, nuevoNombre, nuevoApellido, correo]
       );
-      res.json({ mensaje: "✅ Contraseña actualizada" });
+
+      res.json({ mensaje: "✅ Contraseña actualizada correctamente" });
     } catch (err) {
       console.error("❌ Error al cambiar contraseña:", err);
       res.status(500).json({ error: "Error interno del servidor" });
