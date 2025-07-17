@@ -63,7 +63,6 @@ async function main() {
       res.status(500).json({ error: "Error interno del servidor" });
     }
   });
-
   // REGISTRO SIN ENCRIPTACIÓN
   app.post("/registro", async (req, res) => {
     const { correox, nombrex, clavex, rolx, apellidox } = req.body;
