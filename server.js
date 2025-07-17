@@ -52,8 +52,8 @@ async function main() {
         return res.status(401).json({ error: "Contraseña incorrecta" });
       }
 
-      const { id, nombre, apellido, rol } = usuario;
-      res.json({ id, correo, nombre, apellido, rol });
+      const { id, nombre, apellido, rol, grado_asignado } = usuario;
+      res.json({ id, correo, nombre, apellido, rol, grado_asignado });
 
     } catch (err) {
       console.error("❌ Error en /login:", err);
@@ -236,13 +236,38 @@ async function main() {
     }
   });
 
-  // OBTENER USUARIOS (opcional para interfaz)
+  // OBTENER USUARIOS (incluye grado_asignado)
   app.get("/usuarios", async (req, res) => {
     try {
-      const [rows] = await db.query("SELECT id, correo, nombre, apellido FROM usuarios");
+      const [rows] = await db.query("SELECT id, correo, nombre, apellido, grado_asignado FROM usuarios");
       res.json(rows);
     } catch (err) {
       console.error("❌ Error al obtener usuarios:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
+    }
+  });
+
+  // ACTUALIZAR GRADO ASIGNADO A UN USUARIO
+  app.put("/usuarios/grado", async (req, res) => {
+    const { correo, grado_asignado } = req.body;
+
+    if (!correo || !grado_asignado) {
+      return res.status(400).json({ error: "Correo y grado asignado son requeridos" });
+    }
+
+    try {
+      const [result] = await db.query(
+        "UPDATE usuarios SET grado_asignado = ? WHERE correo = ?",
+        [grado_asignado, correo]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      res.json({ mensaje: "✅ Grado asignado actualizado correctamente" });
+    } catch (err) {
+      console.error("❌ Error al actualizar grado:", err);
       res.status(500).json({ error: "Error interno del servidor" });
     }
   });
